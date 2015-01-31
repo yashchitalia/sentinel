@@ -29,7 +29,7 @@ from email.mime.multipart import MIMEMultipart
 
 
 config = ConfigParser.RawConfigParser()
-config.read('Config file')
+config.read('/etc/sentinel/sentinel_configure.cfg')
 
 destination_email = config.get('Email_configure', 'd_email')
 senders_email = config.get('Email_configure', 's_email')
@@ -54,7 +54,7 @@ def email_sender():
 
     pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
     image_count = len(pics)
-    if image_count >= MAX_PICS_BEFORE_EMAIL and intrusion_time_delta >= datetime.timedelta(minutes=5):
+    if image_count >= MAX_PICS_BEFORE_EMAIL and intrusion_time_delta >= datetime.timedelta(minutes=1):
         # Create the container (outer) email message.
         msg = MIMEMultipart('mixed')
         msg['Subject'] = '[SENTINEL MSG]['+str(current_intrusion_datetime)+'] The sentinel has spotted an intruder!'
@@ -64,15 +64,15 @@ def email_sender():
        
         for p in pics:
             try:
-                fp = open(p, 'rb')
+                fp = open(pics_directory+'/'+p, 'rb')
                 print "File opened Successfully"
                 img = MIMEImage(fp.read())
                 fp.close()
                 msg.attach(img)
                 print "Image attached to email"
             except:
-                print "[ERROR]: Couldn't load Image"
-            
+                print "[ERROR]: Couldn't attach picture "+p+". Exiting this pass."
+                return
         try:
             # Send the email via gmail's SMTP server.
             server = smtplib.SMTP(smtp_server, smtp_port)
@@ -83,6 +83,7 @@ def email_sender():
                 print "Login Successful"
             except:
                 print "[ERROR]: Could not log in. Are your login details correct?"
+                return
             server.sendmail(senders_email, [destination_email], msg.as_string())
             server.close()
             print "Email Sent Successfully!"
@@ -90,7 +91,7 @@ def email_sender():
             print "[ERROR] Sendmail function may not be getting the right objects. Email not sent."
             return
 
-        pkl.dump(current_intrusion_datetime, open("last_intrusion.p", "wb"))
+        pkl.dump(current_intrusion_datetime, open("/home/pi/sentinel/last_intrusion.p", "wb"))
         #Make a directory in the Motion archives folder with the current date and time name
         os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
         #Add the present pics to this archived folder
