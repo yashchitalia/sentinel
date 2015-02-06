@@ -50,12 +50,14 @@ MAX_PICS_BEFORE_EMAIL = 5
 def owner_at_home():
     '''Performs an arp-scan and returns a string. We will scan the string
     and search for our network address'''
-    networks = sp.check_output(['sudo', 'arp-scan' ,'-interface', 
-                         'en1', '--localnet'])
-    if ip_address in networks:
-        return True
-    else
-        return False
+    networks = ' '
+    for i in range(5):
+        networks = networks+sp.check_output(['sudo', 'arp-scan' ,'-interface', 'wlan0', '--localnet'])
+        if ip_address in networks:
+            return True
+        else:
+            continue
+    return False
 
 
 def email_sender():
@@ -65,63 +67,71 @@ def email_sender():
     with the date and time of intrusion. We will also store the current date 
     and time in a pickle file, and will click more pics only if 
     current time is greater than 5 mins of the last intrusion'''
+    if not owner_at_home():
+        pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
+        image_count = len(pics)
 
-    pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
-    image_count = len(pics)
-    if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >= 
-            datetime.timedelta(minutes=1)) and (!owner_at_home()):
-        # Create the container (outer) email message.
-        msg = MIMEMultipart('mixed')
-        msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
-        'The sentinel has spotted an intruder!')
-        msg['From'] = senders_email
-        msg['To'] = destination_email
-        msg.preamble = 'Pics of the intruder:'
-       
-        for p in pics:
+        if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >= 
+                        datetime.timedelta(minutes=1)): 
+            # Create the container (outer) email message.
+            msg = MIMEMultipart('mixed')
+            msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
+            'The sentinel has spotted an intruder!')
+            msg['From'] = senders_email
+            msg['To'] = destination_email
+            msg.preamble = 'Pics of the intruder:'
+           
+            for p in pics:
+                try:
+                    fp = open(pics_directory+'/'+p, 'rb')
+                    print "File opened Successfully"
+                    img = MIMEImage(fp.read())
+                    fp.close()
+                    msg.attach(img)
+                    print "Image attached to email"
+                except:
+                    print ("[ERROR]: Couldn't attach picture "+p+". "
+                    "Exiting this pass.")
+                    return
             try:
-                fp = open(pics_directory+'/'+p, 'rb')
-                print "File opened Successfully"
-                img = MIMEImage(fp.read())
-                fp.close()
-                msg.attach(img)
-                print "Image attached to email"
+                # Send the email via gmail's SMTP server.
+                server = smtplib.SMTP(smtp_server, smtp_port)
+                server.ehlo()
+                server.starttls()
+                try: 
+                    server.login(username, password)
+                    print "Login Successful"
+                except:
+                    print ("[ERROR]: Could not log in."
+                    "Are your login details correct?")
+                    return
+                server.sendmail(senders_email, [destination_email], msg.as_string())
+                server.close()
+                print "Email Sent Successfully!"
             except:
-                print ("[ERROR]: Couldn't attach picture "+p+". "
-                "Exiting this pass.")
+                print ("[ERROR] Sendmail function may not be getting the right "
+                "objects. Email not sent.")
                 return
-        try:
-            # Send the email via gmail's SMTP server.
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.ehlo()
-            server.starttls()
-            try: 
-                server.login(username, password)
-                print "Login Successful"
-            except:
-                print ("[ERROR]: Could not log in."
-                "Are your login details correct?")
-                return
-            server.sendmail(senders_email, [destination_email], msg.as_string())
-            server.close()
-            print "Email Sent Successfully!"
-        except:
-            print ("[ERROR] Sendmail function may not be getting the right ")
-            "objects. Email not sent.")
-            return
 
-        pkl.dump((current_intrusion_datetime, 
-            open("/home/pi/sentinel/last_intrusion.p", "wb")))
-        #Make a directory in the Motion archives folder 
-        #with the current date and time name
-        os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
-        #Add the present pics to this archived folder
-        for p in pics:
-            os.rename((pics_directory+'/'+p,  
-                archive_directory+'/'+str(current_intrusion_datetime)+'/'+p))
+            pkl.dump((current_intrusion_datetime, 
+                open("/home/pi/sentinel/last_intrusion.p", "wb")))
+            #Make a directory in the Motion archives folder 
+            #with the current date and time name
+            os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
+            #Add the present pics to this archived folder
+            for p in pics:
+                os.rename((pics_directory+'/'+p,  
+                    archive_directory+'/'+str(current_intrusion_datetime)+'/'+p))
 
+        else:
+            print "Secretly snapping the intruder."
     else:
-        print "Secretly snapping the intruder."
+        print "Owner is home. Sorry, false alarm, deleting clicked pics now..."
+        if os.listdir(pics_directory) == []:
+            return 
+        else:
+            sp.check_output(['sudo', 'rm' , pics_directory+'/*.jpg'])
+            sp.check_output(['sudo', 'rm', pics_directory+'/*.swf'])
 
 def main():
     #Simply call the Email Sender function for now
