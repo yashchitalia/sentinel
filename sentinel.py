@@ -40,7 +40,6 @@ username = senders_email
 password = config.get('Email_configure', 'password')
 archive_directory = config.get('General_configure', 'archive_dir')
 pics_directory = config.get('General_configure', 'motion_dir')
-ip_address = config.get('Network', 'ip_address')
 previous_intrusion_datetime = pkl.load(open("last_intrusion.p", "rb" ))
 current_intrusion_datetime = datetime.datetime.now()
 intrusion_time_delta = current_intrusion_datetime - previous_intrusion_datetime 
@@ -50,29 +49,21 @@ MAX_PICS_BEFORE_EMAIL = 5
 def owner_at_home():
     '''Performs an arp-scan and returns a string. We will scan the string
     and search for our network address'''
-    networks = ' '
-    for i in range(5):
-        networks = networks+sp.check_output(['sudo', 'arp-scan' ,'-interface', 'wlan0', '--localnet'])
-        if ip_address in networks:
-            return True
-        else:
-            continue
-    return False
-
+    return pkl.load(open("owner_at_home.p", "rb" ))
 
 def email_sender():
-    ''' Counts the number of pictures in the /tmp/motion' folder and if the 
-    number of pics is  geq 5, then we first send an email to the user with 
-    those pics attached, and we will move those pics to an archive folder, 
-    with the date and time of intrusion. We will also store the current date 
-    and time in a pickle file, and will click more pics only if 
+    ''' Counts the number of pictures in the /tmp/motion' folder and if the
+    number of pics is  geq 5, then we first send an email to the user with
+    those pics attached, and we will move those pics to an archive folder
+    with the date and time of intrusion. We will also store the current date
+    and time in a pickle file, and will click more pics only if
     current time is greater than 5 mins of the last intrusion'''
     if not owner_at_home():
         pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
         image_count = len(pics)
 
-        if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >= 
-                        datetime.timedelta(minutes=1)): 
+        if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >=
+                        datetime.timedelta(minutes=1)):
             # Create the container (outer) email message.
             msg = MIMEMultipart('mixed')
             msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
@@ -80,7 +71,6 @@ def email_sender():
             msg['From'] = senders_email
             msg['To'] = destination_email
             msg.preamble = 'Pics of the intruder:'
-           
             for p in pics:
                 try:
                     fp = open(pics_directory+'/'+p, 'rb')
@@ -98,7 +88,7 @@ def email_sender():
                 server = smtplib.SMTP(smtp_server, smtp_port)
                 server.ehlo()
                 server.starttls()
-                try: 
+                try:
                     server.login(username, password)
                     print "Login Successful"
                 except:
@@ -120,7 +110,7 @@ def email_sender():
             os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
             #Add the present pics to this archived folder
             for p in pics:
-                os.rename((pics_directory+'/'+p,  
+                os.rename((pics_directory+'/'+p,
                     archive_directory+'/'+str(current_intrusion_datetime)+'/'+p))
 
         else:
@@ -128,7 +118,7 @@ def email_sender():
     else:
         print "Owner is home. Sorry, false alarm, deleting clicked pics now..."
         if os.listdir(pics_directory) == []:
-            return 
+            return
         else:
             sp.check_output(['sudo', 'rm' , pics_directory+'/*.jpg'])
             sp.check_output(['sudo', 'rm', pics_directory+'/*.swf'])

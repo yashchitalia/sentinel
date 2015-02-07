@@ -1,0 +1,1 @@
+*/1 * * * * pi /usr/bin/python /home/pi/sentinel/owner_at_home_test.py
