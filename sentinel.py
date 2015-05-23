@@ -40,7 +40,7 @@ username = senders_email
 password = config.get('Email_configure', 'password')
 archive_directory = config.get('General_configure', 'archive_dir')
 pics_directory = config.get('General_configure', 'motion_dir')
-previous_intrusion_datetime = pkl.load(open("last_intrusion.p", "rb" ))
+previous_intrusion_datetime = pkl.load(open("/home/pi/sentinel/last_intrusion.p", "rb" ))
 current_intrusion_datetime = datetime.datetime.now()
 intrusion_time_delta = current_intrusion_datetime - previous_intrusion_datetime 
 MAX_PICS_BEFORE_EMAIL = 5
@@ -49,7 +49,7 @@ MAX_PICS_BEFORE_EMAIL = 5
 def owner_at_home():
     '''Performs an arp-scan and returns a string. We will scan the string
     and search for our network address'''
-    return pkl.load(open("owner_at_home.p", "rb" ))
+    return pkl.load(open("/home/pi/sentinel/at_home.p", "rb" ))
 
 def email_sender():
     ''' Counts the number of pictures in the /tmp/motion' folder and if the
@@ -61,9 +61,9 @@ def email_sender():
     if not owner_at_home():
         pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
         image_count = len(pics)
-
+        print "Number of pics we plan to upload:{}".format(image_count)
         if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >=
-                        datetime.timedelta(minutes=1)):
+                        datetime.timedelta(minutes=3)):
             # Create the container (outer) email message.
             msg = MIMEMultipart('mixed')
             msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
@@ -102,17 +102,16 @@ def email_sender():
                 print ("[ERROR] Sendmail function may not be getting the right "
                 "objects. Email not sent.")
                 return
-
-            pkl.dump((current_intrusion_datetime, 
-                open("/home/pi/sentinel/last_intrusion.p", "wb")))
+            pkl.dump(current_intrusion_datetime, 
+                open("/home/pi/sentinel/last_intrusion.p", "wb"))
             #Make a directory in the Motion archives folder 
             #with the current date and time name
             os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
             #Add the present pics to this archived folder
             for p in pics:
-                os.rename((pics_directory+'/'+p,
-                    archive_directory+'/'+str(current_intrusion_datetime)+'/'+p))
-
+                os.rename(pics_directory+'/'+p,
+                    archive_directory+'/'+str(current_intrusion_datetime)+'/'+p)
+            print "Finished transferring images into archives"
         else:
             print "Secretly snapping the intruder."
     else:
@@ -120,8 +119,11 @@ def email_sender():
         if os.listdir(pics_directory) == []:
             return
         else:
-            sp.check_output(['sudo', 'rm' , pics_directory+'/*.jpg'])
-            sp.check_output(['sudo', 'rm', pics_directory+'/*.swf'])
+            try:
+                for the_file in os.listdir(pics_directory):
+                    sp.check_output(['sudo', 'rm' , pics_directory+'/'+the_file])
+            except:
+                return
 
 def main():
     #Simply call the Email Sender function for now

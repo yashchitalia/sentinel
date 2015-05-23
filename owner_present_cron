@@ -1,1 +1,2 @@
-*/1 * * * * pi /usr/bin/python /home/pi/sentinel/owner_at_home_test.py
+* * * * * pi /usr/bin/python2.7 /home/pi/sentinel/owner_at_home_test.py
+
