@@ -28,18 +28,6 @@ import subprocess as sp
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 
-
-config = ConfigParser.RawConfigParser()
-config.read('/etc/sentinel/sentinel_configure.cfg')
-
-destination_email = config.get('Email_configure', 'd_email')
-senders_email = config.get('Email_configure', 's_email')
-smtp_server = config.get('Email_configure', 'smtp_server')
-smtp_port = config.getint('Email_configure', 'smtp_port')
-username = senders_email
-password = config.get('Email_configure', 'password')
-archive_directory = config.get('General_configure', 'archive_dir')
-pics_directory = config.get('General_configure', 'motion_dir')
 previous_intrusion_datetime = pkl.load(open("/home/pi/sentinel/last_intrusion.p", "rb" ))
 current_intrusion_datetime = datetime.datetime.now()
 intrusion_time_delta = current_intrusion_datetime - previous_intrusion_datetime 
@@ -58,77 +46,89 @@ def email_sender():
     with the date and time of intrusion. We will also store the current date
     and time in a pickle file, and will click more pics only if
     current time is greater than 5 mins of the last intrusion'''
-    if not owner_at_home():
-        pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
-        image_count = len(pics)
-        print "Number of pics we plan to upload:{}".format(image_count)
-        if image_count >= MAX_PICS_BEFORE_EMAIL and (intrusion_time_delta >=
-                        datetime.timedelta(minutes=3)):
-            # Create the container (outer) email message.
-            msg = MIMEMultipart('mixed')
-            msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
-            'The sentinel has spotted an intruder!')
-            msg['From'] = senders_email
-            msg['To'] = destination_email
-            msg.preamble = 'Pics of the intruder:'
-            for p in pics:
-                try:
-                    fp = open(pics_directory+'/'+p, 'rb')
-                    print "File opened Successfully"
-                    img = MIMEImage(fp.read())
-                    fp.close()
-                    msg.attach(img)
-                    print "Image attached to email"
-                except:
-                    print ("[ERROR]: Couldn't attach picture "+p+". "
-                    "Exiting this pass.")
-                    return
+    config = ConfigParser.RawConfigParser()
+    config.read('/etc/sentinel/sentinel_configure.cfg')
+
+    destination_email = config.get('Email_configure', 'd_email')
+    senders_email = config.get('Email_configure', 's_email')
+    smtp_server = config.get('Email_configure', 'smtp_server')
+    smtp_port = config.getint('Email_configure', 'smtp_port')
+    username = senders_email
+    password = config.get('Email_configure', 'password')
+    archive_directory = config.get('General_configure', 'archive_dir')
+    pics_directory = config.get('General_configure', 'motion_dir')
+
+    pics = [f for f in os.listdir(pics_directory) if f.endswith('.jpg')]
+    image_count = len(pics)
+    print "Number of pics we plan to upload:{}".format(image_count)
+    if image_count >= MAX_PICS_BEFORE_EMAIL:
+        #We're treating this as a legitimate intrusion, so we will update the intrusion 
+        #datetime object
+        pkl.dump(current_intrusion_datetime, 
+            open("/home/pi/sentinel/last_intrusion.p", "wb"))
+        # Create the container (outer) email message.
+        msg = MIMEMultipart('mixed')
+        msg['Subject'] = ('[SENTINEL MSG]['+str(current_intrusion_datetime)+']'
+        'The sentinel has spotted an intruder!')
+        msg['From'] = senders_email
+        msg['To'] = destination_email
+        msg.preamble = 'Pics of the intruder:'
+        for p in pics:
             try:
-                # Send the email via gmail's SMTP server.
-                server = smtplib.SMTP(smtp_server, smtp_port)
-                server.ehlo()
-                server.starttls()
-                try:
-                    server.login(username, password)
-                    print "Login Successful"
-                except:
-                    print ("[ERROR]: Could not log in."
-                    "Are your login details correct?")
-                    return
-                server.sendmail(senders_email, [destination_email], msg.as_string())
-                server.close()
-                print "Email Sent Successfully!"
+                fp = open(pics_directory+'/'+p, 'rb')
+                print "File opened Successfully"
+                img = MIMEImage(fp.read())
+                fp.close()
+                msg.attach(img)
+                print "Image attached to email"
             except:
-                print ("[ERROR] Sendmail function may not be getting the right "
-                "objects. Email not sent.")
+                print ("[ERROR]: Couldn't attach picture "+p+". "
+                "Exiting this pass.")
                 return
-            pkl.dump(current_intrusion_datetime, 
-                open("/home/pi/sentinel/last_intrusion.p", "wb"))
-            #Make a directory in the Motion archives folder 
-            #with the current date and time name
-            os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
-            #Add the present pics to this archived folder
-            for p in pics:
-                os.rename(pics_directory+'/'+p,
-                    archive_directory+'/'+str(current_intrusion_datetime)+'/'+p)
-            print "Finished transferring images into archives"
-        else:
-            print "Secretly snapping the intruder."
-    else:
-        print "Owner is home. Sorry, false alarm, deleting clicked pics now..."
-        if os.listdir(pics_directory) == []:
+        try:
+            # Send the email via gmail's SMTP server.
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.ehlo()
+            server.starttls()
+            try:
+                server.login(username, password)
+                print "Login Successful"
+            except:
+                print ("[ERROR]: Could not log in."
+                "Are your login details correct?")
+                return
+            server.sendmail(senders_email, [destination_email], msg.as_string())
+            server.close()
+            print "Email Sent Successfully!"
+        except:
+            print ("[ERROR] Sendmail function may not be getting the right "
+            "objects. Email not sent.")
             return
-        else:
-            try:
-                for the_file in os.listdir(pics_directory):
-                    sp.check_output(['sudo', 'rm' , pics_directory+'/'+the_file])
-            except:
-                return
+        #Make a directory in the Motion archives folder 
+        #with the current date and time name
+        os.mkdir(archive_directory+'/'+str(current_intrusion_datetime))
+        #Add the present pics to this archived folder
+        for p in pics:
+            os.rename(pics_directory+'/'+p,
+                archive_directory+'/'+str(current_intrusion_datetime)+'/'+p)
+        print "Finished transferring images into archives"
+    else:
+        print "Secretly snapping the intruder."
 
 def main():
-    #Simply call the Email Sender function for now
-    email_sender()
-
-
+    '''If you are not at home and the last motion happened long ago, consider this as a 
+    new intrusion'''
+    print owner_at_home()
+    print intrusion_time_delta
+    if (not owner_at_home()) and (intrusion_time_delta >=
+                    datetime.timedelta(minutes=3)):
+        #call the Email Sender function
+        email_sender()
+    else:
+        if owner_at_home():
+            print "Owner is home. Sorry, false alarm.."
+        else:
+            print "Already snapped pics of current intrusion"
+        return
 if __name__ == '__main__':
     main()
