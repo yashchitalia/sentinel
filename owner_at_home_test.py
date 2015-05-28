@@ -29,8 +29,7 @@ import time
 
 config = ConfigParser.RawConfigParser()
 config.read('/etc/sentinel/sentinel_configure.cfg')
-#owner_test_type = (config.get('Network', 'owner_test_type'))#Can be either "FITBIT" or "PHONE_IP"
-owner_test_type = 'PHONE_IP'
+owner_test_type = (config.get('Network', 'owner_test_type'))#Can be either "FITBIT" or "PHONE_IP"
 ip_address = config.get('Network', 'ip_address')
 fitbit_tracker_id = config.get('Network', 'fitbit_tracker_id')
 
