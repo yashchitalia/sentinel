@@ -1,2 +1,4 @@
 * * * * * pi /usr/bin/python2.7 /home/pi/sentinel/owner_at_home_test.py
 @reboot pi /usr/bin/motion -s
+*/15 * * * * pi /usr/local/bin/galileo
+

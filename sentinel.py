@@ -44,9 +44,17 @@ motion_directory = config.get('General_configure', 'motion_dir')
 
 
 def owner_at_home():
-    '''Performs an arp-scan and returns a string. We will scan the string
-    and search for our network address'''
-    return pkl.load(open("/home/pi/sentinel/at_home.p", "rb" ))
+    '''We load the pickle file that holds the buffer of at_home checks.
+    We will declare owner to be home if a majority of elements of the 
+    buffer are True. The pickle file is updated regularly by a cron'''
+    check_buffer = pkl.load(open("/home/pi/sentinel/at_home.p", "rb" ))
+    SIZE_OF_CHECK_BUFFER = len(check_buffer)
+    comparison_buffer = ([True]*(SIZE_OF_CHECK_BUFFER/2) + 
+                            [False]*(SIZE_OF_CHECK_BUFFER/2))
+    if check_buffer > comparison_buffer:
+        return True
+    else:
+        return False
 
 
 def pic_mover():

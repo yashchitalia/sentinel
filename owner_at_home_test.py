@@ -32,6 +32,13 @@ config.read('/etc/sentinel/sentinel_configure.cfg')
 owner_test_type = (config.get('Network', 'owner_test_type'))#Can be either "FITBIT" or "PHONE_IP"
 ip_address = config.get('Network', 'ip_address')
 fitbit_tracker_id = config.get('Network', 'fitbit_tracker_id')
+SIZE_OF_CHECK_BUFFER = 10
+try:
+    check_buffer = pkl.load(open("/home/pi/sentinel/at_home.p", "rb"))
+    if len(check_buffer) < SIZE_OF_CHECK_BUFFER:
+        raise IndexError('Buffer List Size too small. Creating new buffer')
+except:
+    check_buffer = [True]*(SIZE_OF_CHECK_BUFFER/2) + [False]*(SIZE_OF_CHECK_BUFFER/2)
 
 def main():
     networks = ' '
@@ -40,15 +47,19 @@ def main():
         for i in range(10):
             networks = sp.check_output(['sudo', 'arp-scan', '-interface', 'wlan0', '--localnet'])
             if ip_address in networks:
-                pkl.dump(True, open("/home/pi/sentinel/at_home.p", "wb"))
+                check_buffer.append(True)
+                check_buffer.pop(0)
+                pkl.dump(check_buffer, open("/home/pi/sentinel/at_home.p", "wb"))
                 return
             else:
                 continue
-        pkl.dump(False, open("/home/pi/sentinel/at_home.p", "wb"))
+        check_buffer.append(False)
+        check_buffer.pop(0)
+        pkl.dump(check_buffer, open("/home/pi/sentinel/at_home.p", "wb"))
     elif owner_test_type == 'FITBIT':
-        check_for_fitbit()#Do a check
-        time.sleep(25)
-        check_for_fitbit()#Do another check
+        for i in range(3):
+            check_for_fitbit()#Do a check
+            time.sleep(16)
     else:
         print owner_test_type
 
@@ -62,11 +73,15 @@ def check_for_fitbit():
     for tracker in fitbit.discover(FitBitUUID):
         tracker_id =  a2x(tracker.id)
         if tracker_id == fitbit_tracker_id:
-            pkl.dump(True, open("/home/pi/sentinel/at_home.p", "wb"))
+            check_buffer.append(True)
+            check_buffer.pop(0)
+            pkl.dump(check_buffer, open("/home/pi/sentinel/at_home.p", "wb"))
             return
         else:
             continue
-    pkl.dump(False, open("/home/pi/sentinel/at_home.p", "wb"))
+    check_buffer.append(False)
+    check_buffer.pop(0)
+    pkl.dump(check_buffer, open("/home/pi/sentinel/at_home.p", "wb"))
 
 
 if __name__ == '__main__':
