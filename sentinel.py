@@ -51,6 +51,10 @@ def owner_at_home():
     SIZE_OF_CHECK_BUFFER = len(check_buffer)
     comparison_buffer = ([True]*(SIZE_OF_CHECK_BUFFER/2) + 
                             [False]*(SIZE_OF_CHECK_BUFFER/2))
+
+    if check_buffer[-1] == True:
+        return True
+
     if check_buffer > comparison_buffer:
         return True
     else:
